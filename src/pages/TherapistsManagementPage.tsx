@@ -40,6 +40,9 @@ function TherapistsManagementPage() {
   const [filterSpecialization, setFilterSpecialization] = useState<string>('all');
   const [selectedTherapist, setSelectedTherapist] = useState<Therapist | null>(null);
   const [showTherapistModal, setShowTherapistModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTherapist, setEditingTherapist] = useState<Therapist | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Therapist>>({});
   const [therapists, setTherapists] = useState<Therapist[]>([]);
 
   useEffect(() => {
@@ -307,6 +310,96 @@ function TherapistsManagementPage() {
   ];
 
   const specializations = ['All', 'CBT', 'PTSD', 'Trauma', 'Family Therapy', 'Addiction', 'EMDR', 'Anxiety', 'Depression'];
+
+  const handleEditTherapist = (therapist: Therapist) => {
+    setEditingTherapist(therapist);
+    setEditForm({
+      name: therapist.name,
+      email: therapist.email,
+      phone: therapist.phone,
+      specialization: therapist.specialization,
+      experience: therapist.experience,
+      hourlyRate: therapist.hourlyRate,
+      bio: therapist.bio,
+      languages: therapist.languages
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingTherapist || !editForm.name || !editForm.email) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+
+    // Update therapist in local state
+    const updatedTherapists = therapists.map(t => 
+      t.id === editingTherapist.id 
+        ? { ...t, ...editForm }
+        : t
+    );
+    setTherapists(updatedTherapists);
+
+    // Update in localStorage
+    const registeredUsers = JSON.parse(localStorage.getItem('mindcare_registered_users') || '[]');
+    const updatedUsers = registeredUsers.map((u: any) => 
+      u.id === editingTherapist.id 
+        ? { ...u, ...editForm }
+        : u
+    );
+    localStorage.setItem('mindcare_registered_users', JSON.stringify(updatedUsers));
+
+    // Update therapist services
+    const therapistServices = JSON.parse(localStorage.getItem('mindcare_therapist_services') || '[]');
+    const updatedServices = therapistServices.map((s: any) => 
+      s.therapistId === editingTherapist.id 
+        ? { 
+            ...s, 
+            therapistName: editForm.name,
+            specialization: editForm.specialization,
+            experience: editForm.experience,
+            chargesPerSession: editForm.hourlyRate,
+            bio: editForm.bio,
+            languages: editForm.languages
+          }
+        : s
+    );
+    localStorage.setItem('mindcare_therapist_services', JSON.stringify(updatedServices));
+
+    // Update available therapists for booking
+    const availableTherapists = JSON.parse(localStorage.getItem('mindcare_therapists') || '[]');
+    const updatedAvailableTherapists = availableTherapists.map((t: any) => 
+      t.id === editingTherapist.id 
+        ? { 
+            ...t, 
+            name: editForm.name,
+            specialization: editForm.specialization,
+            hourlyRate: editForm.hourlyRate,
+            bio: editForm.bio,
+            languages: editForm.languages
+          }
+        : t
+    );
+    localStorage.setItem('mindcare_therapists', JSON.stringify(updatedAvailableTherapists));
+
+    toast.success('Therapist information updated successfully!');
+    setShowEditModal(false);
+    setEditingTherapist(null);
+    setEditForm({});
+  };
+
+  const handleEditFormChange = (field: string, value: any) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSpecializationToggle = (spec: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      specialization: prev.specialization?.includes(spec)
+        ? prev.specialization.filter(s => s !== spec)
+        : [...(prev.specialization || []), spec]
+    }));
+  };
 
   return (
     <div className={`h-screen flex flex-col ${
@@ -613,7 +706,13 @@ function TherapistsManagementPage() {
                   >
                     <Eye className="w-4 h-4" />
                   </button>
-                  <button className="p-2 text-gray-500 hover:text-green-600 transition-colors">
+                  <button
+                    onClick={() => handleEditTherapist(therapist)}
+                    className="p-2 text-gray-500 hover:text-green-600 transition-colors"
+                  >
+                    onClick={() => handleEditTherapist(therapist)}
+                    className="p-2 text-gray-500 hover:text-green-600 transition-colors"
+                  >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
@@ -791,6 +890,231 @@ function TherapistsManagementPage() {
                       {selectedTherapist.bio}
                     </p>
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Edit Therapist Modal */}
+        {showEditModal && editingTherapist && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowEditModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className={`max-w-2xl w-full rounded-2xl shadow-2xl max-h-96 overflow-y-auto ${
+                theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className={`text-2xl font-bold ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-800'
+                  }`}>
+                    Edit Therapist
+                  </h2>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                    }`}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Basic Information */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${
+                        theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.name || ''}
+                        onChange={(e) => handleEditFormChange('name', e.target.value)}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          theme === 'dark'
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${
+                        theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={editForm.email || ''}
+                        onChange={(e) => handleEditFormChange('email', e.target.value)}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          theme === 'dark'
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${
+                        theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={editForm.phone || ''}
+                        onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          theme === 'dark'
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${
+                        theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Hourly Rate ($)
+                      </label>
+                      <input
+                        type="number"
+                        min="50"
+                        max="500"
+                        value={editForm.hourlyRate || ''}
+                        onChange={(e) => handleEditFormChange('hourlyRate', parseInt(e.target.value))}
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          theme === 'dark'
+                            ? 'bg-gray-700 border-gray-600 text-white'
+                            : 'bg-white border-gray-300 text-gray-900'
+                        } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      Experience
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.experience || ''}
+                      onChange={(e) => handleEditFormChange('experience', e.target.value)}
+                      placeholder="e.g., 8 years"
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        theme === 'dark'
+                          ? 'bg-gray-700 border-gray-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-900'
+                      } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                  </div>
+
+                  {/* Specializations */}
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      Specializations
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {specializations.filter(s => s !== 'All').map((spec) => (
+                        <button
+                          key={spec}
+                          type="button"
+                          onClick={() => handleSpecializationToggle(spec)}
+                          className={`px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+                            editForm.specialization?.includes(spec)
+                              ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                              : theme === 'dark'
+                              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {spec}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bio */}
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      Bio
+                    </label>
+                    <textarea
+                      value={editForm.bio || ''}
+                      onChange={(e) => handleEditFormChange('bio', e.target.value)}
+                      rows={3}
+                      className={`w-full px-3 py-2 rounded-lg border resize-none ${
+                        theme === 'dark'
+                          ? 'bg-gray-700 border-gray-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-900'
+                      } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                  </div>
+
+                  {/* Languages */}
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      Languages (comma-separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.languages?.join(', ') || ''}
+                      onChange={(e) => handleEditFormChange('languages', e.target.value.split(',').map(l => l.trim()))}
+                      placeholder="English, Spanish, French"
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        theme === 'dark'
+                          ? 'bg-gray-700 border-gray-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-900'
+                      } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3 mt-6">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowEditModal(false)}
+                    className={`flex-1 py-3 rounded-xl font-medium ${
+                      theme === 'dark'
+                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSaveEdit}
+                    className="flex-1 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl font-medium hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                  >
+                    Save Changes
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
